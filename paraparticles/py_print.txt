@@ -1,0 +1,26 @@
+New run
+Time step = 0, time taken = 0.18096208572387695 for each step
+Time step = 1, time taken = 0.5646882057189941 for each step
+Time step = 2, time taken = 0.5545201301574707 for each step
+Time step = 3, time taken = 0.5634510517120361 for each step
+Time step = 4, time taken = 0.5596067905426025 for each step
+Time step = 5, time taken = 0.5418241024017334 for each step
+Time step = 6, time taken = 0.5572421550750732 for each step
+Time step = 7, time taken = 0.5294821262359619 for each step
+Time step = 8, time taken = 0.5423328876495361 for each step
+Time step = 9, time taken = 0.5661501884460449 for each step
+Time step = 10, time taken = 0.5848541259765625 for each step
+Time step = 11, time taken = 0.49206089973449707 for each step
+Time step = 12, time taken = 0.47632527351379395 for each step
+Time step = 13, time taken = 0.47251081466674805 for each step
+Time step = 14, time taken = 0.4832170009613037 for each step
+Time step = 15, time taken = 0.48251914978027344 for each step
+Time step = 16, time taken = 0.47965002059936523 for each step
+Time step = 17, time taken = 0.4840688705444336 for each step
+Time step = 18, time taken = 0.4752991199493408 for each step
+Time step = 19, time taken = 0.4835548400878906 for each step
+Time step = 20, time taken = 0.4761931896209717 for each step
+Time step = 21, time taken = 0.4689509868621826 for each step
+Time step = 22, time taken = 0.46874499320983887 for each step
+Time step = 23, time taken = 0.494779109954834 for each step
+Time step = 24, time taken = 0.5351569652557373 for each step
