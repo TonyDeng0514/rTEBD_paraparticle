@@ -4,6 +4,29 @@ Time-evolution by block decimation (TEBD) for a paraparticle chain, represented 
 
 ---
 
+## Project Structure
+
+`paraparticles/` is a Python package. All scripts and notebooks must be run from the **repo root** (`rTEBD/`) so that `import paraparticles` resolves correctly.
+
+```
+rTEBD/
+├── paraparticles/          # core simulation package
+│   ├── __init__.py
+│   ├── MPDO.py
+│   ├── build_MPDO_from_mps.py
+│   ├── Hamiltonian.py
+│   ├── GellMann.py
+│   ├── Umat.py
+│   ├── ED.py
+│   └── rTEBD_para.ipynb
+└── bond_convergence/       # bond-dimension convergence study
+    ├── bond_convergence.py
+    ├── 01_bond_convergence.ipynb
+    └── results/
+```
+
+---
+
 ## File List
 
 | File | Purpose |
@@ -15,6 +38,8 @@ Time-evolution by block decimation (TEBD) for a paraparticle chain, represented 
 | `paraparticles/Umat.py` | Converts a 9×9 two-site unitary into its rank-4 superoperator tensor `U_all[i,j,k,l]` |
 | `paraparticles/ED.py` | Exact diagonalization: assembles the full 3^L × 3^L Hamiltonian from the MPO for benchmark comparisons |
 | `paraparticles/rTEBD_para.ipynb` | Driver notebook: runs TEBD, then runs ED on the same disorder realization and plots per-site n_j(t) and total particle number for both methods |
+| `bond_convergence/bond_convergence.py` | Runs TEBD at a fixed bond dimension χ and saves per-site n_j(t), trace, and parameters to `results/` as a `.npz` file |
+| `bond_convergence/01_bond_convergence.ipynb` | Analysis notebook for bond-dimension convergence study |
 
 ---
 

@@ -1,10 +1,9 @@
 import numpy as np
 from scipy.linalg import svd
 
-from Hamiltonian import draw_dis, draw_q, build_bond_gates, n_loc
-from build_MPDO_from_mps import random_config, initial_MPDO_dict
-
-from GellMann import gellmann_tilde
+from .Hamiltonian import draw_dis, draw_q, build_bond_gates, n_loc
+from .build_MPDO_from_mps import random_config, initial_MPDO_dict
+from .GellMann import gellmann_tilde
 
 class MPDO:
     # Hamiltonian parameters

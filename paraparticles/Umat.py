@@ -1,5 +1,5 @@
 import numpy as np
-from GellMann import dagger, gellmann_bar, gellmann_normal, gellmann_tilde, mat_dot4
+from .GellMann import dagger, gellmann_bar, gellmann_normal, gellmann_tilde, mat_dot4
 
 
 

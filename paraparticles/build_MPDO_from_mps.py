@@ -1,7 +1,7 @@
 import numpy as np
 
-from GellMann import I_3, l_3, mat_dot2, gellmann_bar
-from Hamiltonian import n_a, n_b
+from .GellMann import I_3, l_3, mat_dot2, gellmann_bar
+from .Hamiltonian import n_a, n_b
 
 # build random initial state
 def random_config(L, N, Na, rng=None):
