@@ -1,6 +1,6 @@
 # rTEBD_paraparticle
 
-Time-evolution by block decimation (TEBD) for a paraparticle chain, represented as a Matrix Product Density Operator (MPDO) in the operator-vectorization (Liouville) picture.
+Time-evolution by block decimation (TEBD) for a paraparticle chain, represented as a Matrix Product Density Operator (MPDO) in the operator-vectorization (Liouville) picture. Results are validated against exact diagonalization (ED).
 
 ---
 
@@ -103,7 +103,7 @@ Indices: (i, j) = output operator basis on sites (left, right); (k, l) = input o
    - `'right'` (λ absorbed right): `A1 = reshape(Lp, (χ₁, 9, χ'))`, `A2 = reshape(λ·R, (χ', 9, χ₂))`, `lmbd_position = ind[1]`
    - `'left'` (λ absorbed left): `A1 = reshape(Lp·λ, (χ₁, 9, χ'))`, `A2 = reshape(R, (χ', 9, χ₂))`, `lmbd_position = ind[0]`
 
-**Sweep order** (`sweepU`): odd bonds (0,1), (2,3), … then even bonds (1,2), (3,4), … all with `dirc='right'`. The odd-bond gates are built with `τ/2` and even-bond gates with `τ` (`Hamiltonian.py`), implementing only the first half of Strang splitting — the second odd-bond pass (which would make it second-order) is absent.
+**Sweep order** (`sweepU`): odd bonds (0,1), (2,3), … then even bonds (1,2), (3,4), … all with `dirc='right'`. Both odd and even bond gates are built with the full step `τ` (`Hamiltonian.py`), giving a simple first-order Trotter decomposition exp(−iH_odd·τ) · exp(−iH_even·τ) per sweep.
 
 ---
 
@@ -119,7 +119,7 @@ Called via `measure_TEBD` at the end of each `sweepU` and once at the end of `__
 left_trace[i] = 1 ⊗ (3·A_0[:,0,:]) ⊗ (3·A_1[:,0,:]) ⊗ … ⊗ (3·A_{i-1}[:,0,:])
 ```
 
-Index 0 selects the identity/trace channel of each site tensor. The factor of 3 per site is `Tr[I₃] = 3`, the contribution from tracing out the identity channel physically. `build_right` builds `right_trace[i]` analogously from the right.
+Index 0 selects the identity/trace channel of each site tensor. The factor of 3 per site is `Tr[I₃] = 3`, the physical contribution from tracing out the identity channel. `build_right` builds `right_trace[i]` analogously from the right.
 
 **Single-site measurement** `tensordot_n(ind)`:
 
@@ -131,68 +131,7 @@ result = Σ_j  n_coeffs[j] · (left_trace[ind] @ A_ind[:,j,:] @ right_trace[ind]
 
 For g=1 the non-zero coefficients are: `n_coeffs[0]=2`, `n_coeffs[3]=−1`, `n_coeffs[8]=−1/√3`. All other Gell-Mann matrices have zero overlap with `n_loc` and are skipped.
 
-**Trace** (`tr_TEBD`): contracts `3·A_i[:,0,:]` across all sites — this is the physical trace `Tr[ρ]`, which should equal 1 for a normalized state.
-
----
-
-## Normalization Bug Diagnosis (post-refactor)
-
-After the refactor to standard SU(3) Gell-Mann matrices, the simulation was giving ~10⁻⁵ particles instead of integer values. The following checks were run to locate and fix the cause.
-
-### Check 1 — GellMann.py: Orthonormality PASSES
-
-Current definitions:
-- `l_3 = diag(1, −1, 0)` — standard SU(3) λ₃ (old `diag(0,1,1)` is commented out)
-- `l_8 = (1/√3)·diag(1, 1, −2)` — standard SU(3) λ₈ (old `diag(0,1,−1)` is commented out)
-- `gellmann_tilde(g)` = `{I₃, g·λ₁, …, g·λ₈}`
-- `gellmann_bar(g)` = `{I₃/3, λ₁/(2g), …, λ₈/(2g)}`
-
-`Tr[λ̄_j · λ̃_k] = δ_{jk}` holds for all 81 pairs:
-- j=k=0: `Tr[(I₃/3)·I₃] = 1` ✓
-- j=k≥1: `Tr[λⱼ/(2g) · g·λⱼ] = (1/2)·Tr[λⱼ²] = (1/2)·2 = 1` ✓
-- j≠k: zero by tracelessness or Gell-Mann orthogonality ✓
-
-`check_orthonormality()` passes.
-
-### Check 2 — Umat.py: Identity check PASSES
-
-Current formula (old `1/9` scalar prefactor removed):
-
-```
-U_all[i,j,k,l] = Tr( (λ̄_i ⊗ λ̄_j) · U · (λ̃_k ⊗ λ̃_l) · U† )
-```
-
-With U = I₉: `U_all[i,j,k,l] = Tr[λ̄_i·λ̃_k] · Tr[λ̄_j·λ̃_l] = δ_{ik}·δ_{jl}` ✓
-
-`check_Umat()` passes.
-
-### Check 3 — build_MPDO_from_mps.py: Reconstruction PASSES
-
-For each state, `A[j] = Tr(gellmann_bar(g)[j] · ρ)` and `ρ_rec = Σ_j A[j] · gellmann_tilde(g)[j]`.
-
-Checked for flavor-a (`ρ = diag(0,1,0)`, g=1):
-- `A[0] = 1/3`,  `A[3] = −1/2`,  `A[8] = 1/(2√3)`,  all others 0
-- `ρ_rec = (1/3)·I₃ + (−1/2)·diag(1,−1,0) + (1/(2√3))·(1/√3)·diag(1,1,−2)`
-- `= diag(1/3−1/2+1/6,  1/3+1/2+1/6,  1/3+0−1/3) = diag(0,1,0)` ✓
-
-Same holds for vacuum and flavor-b. Reconstruction is correct.
-
-### Check 4 — MPDO.py: tensordot_n PASSES (after fix)
-
-**n_coeffs** `n_coeffs[j] = Tr[n_loc · gellmann_tilde(g)[j]]` with g=1:
-
-| j | value |
-|---|---|
-| 0 | 2 |
-| 3 | −1 |
-| 8 | −1/√3 |
-| all others | 0 |
-
-Single-site dot product for flavor-a: `2·(1/3) + (−1)·(−1/2) + (−1/√3)·(1/(2√3)) = 2/3 + 1/2 − 1/6 = 1.0` ✓
-
-**Root cause of the ~10⁻⁵ symptom (now fixed):** Because `gellmann_bar[0] = I₃/3`, every normalized site has `A_k[0] = 1/3`. Without the factor of `Tr[I₃] = 3` per environment site, the environment tensors accumulated a suppression of `(1/3)^(L−1)` — exactly `(1/3)⁹ ≈ 5 × 10⁻⁵` for L=10.
-
-**Fix applied:** `build_left` and `build_right` now contract with `3 · A_k[:,0,:]` (one factor of 3 per site, representing `Tr[I₃]`). The `tr_TEBD` loop applies the same factor. With this fix, measurements return integer values at t=0.
+**Trace** (`tr_TEBD`): contracts `3·A_i[:,0,:]` across all sites — this is the physical trace `Tr[ρ]`, which equals 1 for a normalized state.
 
 ---
 
@@ -213,7 +152,7 @@ Items marked **FIXED** were resolved. Items marked **OPEN** remain outstanding.
 ---
 
 **3. ~~`build_left` / `build_right` were missing `Tr[I₃] = 3` per environment site.~~ — FIXED**
-Each environment contraction now uses `3 · A_k[:,0,:]`. The factor of 3 = `Tr[I₃]` is the physical partial trace contribution from tracing out the identity channel of each environment site. The `tr_TEBD` loop applies the same factor. With the correct normalization, all measurements return physically sensible values (integers at t=0, conserved total number under TEBD within Trotter error).
+Each environment contraction now uses `3 · A_k[:,0,:]`. The factor of 3 = `Tr[I₃]` is the physical partial trace contribution from tracing out the identity channel of each environment site. The `tr_TEBD` loop applies the same factor. Measurements return integer values at t=0 and total particle number is conserved under TEBD, consistent with ED.
 
 ---
 
@@ -228,14 +167,9 @@ Each environment contraction now uses `3 · A_k[:,0,:]`. The factor of 3 = `Tr[I
 ---
 
 **6. ~~Initial measurement not populated before the first sweep.~~ — FIXED**
-`__init__` now calls `self.measure_TEBD()` after constructing the initial MPDO, so `ni_persite` and `tr_TEBD` are populated at t=0 before any sweep runs. The notebook correctly stores `ni[j][0] = mps_evolve.ni_persite[j]` immediately after instantiation.
+`__init__` calls `self.measure_TEBD()` after constructing the initial MPDO, so `ni_persite` and `tr_TEBD` are populated at t=0 before any sweep runs.
 
 ---
 
 **7. ~~`GellMann.py` returned `np.matrix` objects, not `np.ndarray`.~~ — FIXED**
 `l_1` through `l_8` previously used `np.matrix(…)`. They now use `np.array(…)` throughout, eliminating the risk of silent matrix-multiply semantics and the deprecation warning.
-
----
-
-**8. Strang splitting is incomplete. — OPEN**
-`build_bond_gates` builds odd gates with `τ/2` and even gates with `τ`, implying second-order Strang splitting. But `sweepU` applies only one odd pass (at `τ/2`) followed by one even pass (at `τ`), omitting the closing odd pass (at `τ/2`). Each time step accumulates first-order Trotter error, not second-order.

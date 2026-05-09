@@ -119,7 +119,7 @@ def build_bond_gates(L, t, Omega_list, q_list, V_list, tau, g=1):
     gates_even = []   # bonds (1,2), (3,4), (5,6), ...  ← bond index 2k+1
     for i, h in enumerate(h_tilde_list):
         if i % 2 == 0:
-            gates_odd.append(U_mat(_expm_hermitian(h, tau / 2.0), g))
+            gates_odd.append(U_mat(_expm_hermitian(h, tau), g))
         else:
             gates_even.append(U_mat(_expm_hermitian(h, tau), g))
     return gates_odd, gates_even
