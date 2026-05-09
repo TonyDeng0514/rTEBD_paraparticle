@@ -11,9 +11,10 @@ Time-evolution by block decimation (TEBD) for a paraparticle chain, represented 
 | `paraparticles/MPDO.py` | Main simulation class: stores the MPDO tensor network, runs TEBD sweeps, and measures observables |
 | `paraparticles/build_MPDO_from_mps.py` | Builds the initial product-state MPDO dict from a classical configuration vector |
 | `paraparticles/Hamiltonian.py` | Defines local operators, builds the two-site bond Hamiltonians and their time-evolution gates |
-| `paraparticles/GellMann.py` | Defines the custom 9-element operator basis {I, l_1,…,l_8} and the `gellmann_tilde`/`gellmann_bar` dual pair |
+| `paraparticles/GellMann.py` | Defines the standard SU(3) 9-element operator basis {I, λ₁,…,λ₈} and the `gellmann_tilde`/`gellmann_bar` dual pair |
 | `paraparticles/Umat.py` | Converts a 9×9 two-site unitary into its rank-4 superoperator tensor `U_all[i,j,k,l]` |
-| `paraparticles/rTEBD_para.ipynb` | Driver notebook: instantiates `MPDO`, runs `sweepU` for `Nt` steps, stores and plots `n_i(t)` |
+| `paraparticles/ED.py` | Exact diagonalization: assembles the full 3^L × 3^L Hamiltonian from the MPO for benchmark comparisons |
+| `paraparticles/rTEBD_para.ipynb` | Driver notebook: runs TEBD, then runs ED on the same disorder realization and plots per-site n_j(t) and total particle number for both methods |
 
 ---
 
@@ -28,16 +29,26 @@ Time-evolution by block decimation (TEBD) for a paraparticle chain, represented 
 | Index j | Operator `gellmann_tilde(g)[j]` | Notes |
 |---|---|---|
 | 0 | I₃ | identity / trace channel |
-| 1 | g·l₁ | off-diagonal vac–a |
-| 2 | g·l₂ | off-diagonal vac–a (imaginary) |
-| 3 | g·l₃ = g·diag(0,1,1) | total number n̂_a + n̂_b — **not traceless** |
-| 4 | g·l₄ | off-diagonal vac–b |
-| 5 | g·l₅ | off-diagonal vac–b (imaginary) |
-| 6 | g·l₆ | off-diagonal a–b |
-| 7 | g·l₇ | off-diagonal a–b (imaginary) |
-| 8 | g·l₈ = g·diag(0,1,−1) | flavor magnetization n̂_a − n̂_b |
+| 1 | g·λ₁ | off-diagonal vac–a |
+| 2 | g·λ₂ | off-diagonal vac–a (imaginary) |
+| 3 | g·λ₃ = g·diag(1,−1,0) | standard SU(3) generator (traceless) |
+| 4 | g·λ₄ | off-diagonal vac–b |
+| 5 | g·λ₅ | off-diagonal vac–b (imaginary) |
+| 6 | g·λ₆ | off-diagonal a–b |
+| 7 | g·λ₇ | off-diagonal a–b (imaginary) |
+| 8 | g·λ₈ = g·(1/√3)·diag(1,1,−2) | standard SU(3) generator (traceless) |
 
-Dual basis: `gellmann_bar(g)[j]` = {I₃, (1/g)·l₁, …, (1/g)·l₈}.
+Physical number operators expressed in this basis (from `Hamiltonian.py`):
+
+```
+n_a   = I₃/3 − λ₃/2 + λ₈/(2√3)   = diag(0,1,0)
+n_b   = I₃/3 − λ₈/√3              = diag(0,0,1)
+n_loc = n_a + n_b                   = diag(0,1,1)
+```
+
+**Dual basis:** `gellmann_bar(g)[j]` = {I₃/3, λ₁/(2g), λ₂/(2g), …, λ₈/(2g)}.
+
+Orthonormality: `Tr[λ̄_j · λ̃_k] = δ_{jk}` for all j, k. Verified by `check_orthonormality()` in `GellMann.py`.
 
 **Each site tensor** `A_dict["Ai"]` has shape `(χ_left, 9, χ_right)`:
 
@@ -45,15 +56,15 @@ Dual basis: `gellmann_bar(g)[j]` = {I₃, (1/g)·l₁, …, (1/g)·l₈}.
 - Axis 1: operator-basis index j ∈ {0,…,8}
 - Axis 2: right bond (dimension χ_right)
 
-The component along j at site i is `A[i][j] = Tr(λ̄_j · ρ_i_local)`. The density matrix is notionally reconstructed as ρ = Σ_{j₀,…,j_{L−1}} C(j₀,…) · λ̃_{j₀} ⊗ … ⊗ λ̃_{j_{L−1}}, where C is the MPS scalar given by the matrix product of A tensors at those indices.
+The component at index j is `A[j] = Tr(λ̄_j · ρ_local)`. The density matrix is reconstructed as ρ = Σ_{j₀,…,j_{L−1}} C(j₀,…) · λ̃_{j₀} ⊗ … ⊗ λ̃_{j_{L−1}}, where C is the MPS scalar given by the matrix product of the A tensors at those indices.
 
-**Initial state** (see `build_MPDO_from_mps.py`): product state, χ = 1, shape (1,9,1). Local density matrices:
+**Initial state** (see `build_MPDO_from_mps.py`): product state, χ = 1, shape (1,9,1). Local density matrices and their non-zero Gell-Mann coefficients (g=1):
 
-| Config value | Physical state | Non-zero components |
-|---|---|---|
-| 0 (vacuum) | ρ = I₃ − l₃ = diag(1,0,0) | A[0]=1, all others 0 |
-| 1 (flavor a) | ρ = n_a = diag(0,1,0) | A[0]=1, A[3]=1, A[8]=1 |
-| 2 (flavor b) | ρ = n_b = diag(0,0,1) | A[0]=1, A[3]=1, A[8]=−1 |
+| Config value | Physical state | ρ | Non-zero A components |
+|---|---|---|---|
+| 0 (vacuum) | \|vac⟩ | diag(1,0,0) | A[0]=1/3, A[3]=1/2, A[8]=1/(2√3) |
+| 1 (flavor a) | \|a⟩ | diag(0,1,0) | A[0]=1/3, A[3]=−1/2, A[8]=1/(2√3) |
+| 2 (flavor b) | \|b⟩ | diag(0,0,1) | A[0]=1/3, A[3]=0, A[8]=−1/√3 |
 
 ---
 
@@ -62,10 +73,10 @@ The component along j at site i is `A[i][j] = Tr(λ̄_j · ρ_i_local)`. The den
 **Gate construction** (`Umat.py`):
 
 ```
-U_all[i,j,k,l] = (1/9) · Tr( (λ̄_i ⊗ λ̄_j) · U₉ₓ₉ · (λ̃_k ⊗ λ̃_l) · U†₉ₓ₉ )
+U_all[i,j,k,l] = Tr( (λ̄_i ⊗ λ̄_j) · U₉ₓ₉ · (λ̃_k ⊗ λ̃_l) · U†₉ₓ₉ )
 ```
 
-Indices: (i, j) = output operator basis on sites (left, right); (k, l) = input operator basis on sites (left, right). Shape (9,9,9,9).
+Indices: (i, j) = output operator basis on sites (left, right); (k, l) = input operator basis on sites (left, right). Shape (9,9,9,9). With U = I₉ this correctly reduces to δ_{ik}·δ_{jl}, verified by `check_Umat()` in `Umat.py`.
 
 **`applyU(ind, dirc, U)`** step by step:
 
@@ -98,31 +109,35 @@ Indices: (i, j) = output operator basis on sites (left, right); (k, l) = input o
 
 ## Particle Number Measurement
 
-Called via `measure_TEBD` at the end of each `sweepU`.
+Called via `measure_TEBD` at the end of each `sweepU` and once at the end of `__init__` (so t=0 measurements are populated before the first sweep).
 
 **Environment construction:**
 
-`build_left` builds `left_trace[i]` = matrix product of `A_0[:,0,:] @ A_1[:,0,:] @ … @ A_{i-1}[:,0,:]`. Index `0` selects the identity/trace channel. Shape of `left_trace[i]`: `(χ, χ)` where χ is the bond dimension at site i.
-
-`build_right` builds `right_trace[i]` similarly from the right: `A_{i+1}[:,0,:] @ … @ A_{L-1}[:,0,:]`.
-
-**Single-site measurement** `tensordot_l3(ind)`:
+`build_left` builds `left_trace[i]` as the iterated partial trace from the left up to (but not including) site i:
 
 ```python
-result = left_trace[ind] · (g · A_ind[:,3,:]) · right_trace[ind]   →  scalar
+left_trace[i] = 1 ⊗ (3·A_0[:,0,:]) ⊗ (3·A_1[:,0,:]) ⊗ … ⊗ (3·A_{i-1}[:,0,:])
 ```
 
-- Index `3` selects the `l_3` component = Tr(λ̄₃ · ρ_ind) = (1/g)·Tr(l₃ · ρ_ind)
-- Multiplying by `g` recovers Tr(l₃ · ρ_ind) = ⟨n̂_a + n̂_b⟩_ind
-- Left and right environments supply the partial traces over all other sites
+Index 0 selects the identity/trace channel of each site tensor. The factor of 3 per site is `Tr[I₃] = 3`, the contribution from tracing out the identity channel physically. `build_right` builds `right_trace[i]` analogously from the right.
 
-**Trace** (`tr_TEBD`): contracts `A_i[:,0,:]` across all sites — this is the coefficient of the all-identity term, not the physical trace (see Fragile Points §3 below).
+**Single-site measurement** `tensordot_n(ind)`:
+
+```python
+n_coeffs[j] = Tr[ n_loc · gellmann_tilde(g)[j] ]   (precomputed at init)
+
+result = Σ_j  n_coeffs[j] · (left_trace[ind] @ A_ind[:,j,:] @ right_trace[ind])
+```
+
+For g=1 the non-zero coefficients are: `n_coeffs[0]=2`, `n_coeffs[3]=−1`, `n_coeffs[8]=−1/√3`. All other Gell-Mann matrices have zero overlap with `n_loc` and are skipped.
+
+**Trace** (`tr_TEBD`): contracts `3·A_i[:,0,:]` across all sites — this is the physical trace `Tr[ρ]`, which should equal 1 for a normalized state.
 
 ---
 
 ## Normalization Bug Diagnosis (post-refactor)
 
-After the refactor to standard SU(3) Gell-Mann matrices, the simulation gives ~10⁻⁵ particles instead of integer values. The following checks were run analytically to locate the cause.
+After the refactor to standard SU(3) Gell-Mann matrices, the simulation was giving ~10⁻⁵ particles instead of integer values. The following checks were run to locate and fix the cause.
 
 ### Check 1 — GellMann.py: Orthonormality PASSES
 
@@ -160,9 +175,9 @@ Checked for flavor-a (`ρ = diag(0,1,0)`, g=1):
 - `ρ_rec = (1/3)·I₃ + (−1/2)·diag(1,−1,0) + (1/(2√3))·(1/√3)·diag(1,1,−2)`
 - `= diag(1/3−1/2+1/6,  1/3+1/2+1/6,  1/3+0−1/3) = diag(0,1,0)` ✓
 
-Same holds for vacuum and flavor-b by symmetry. Reconstruction is correct.
+Same holds for vacuum and flavor-b. Reconstruction is correct.
 
-### Check 4 — MPDO.py: tensordot_n FAILS
+### Check 4 — MPDO.py: tensordot_n PASSES (after fix)
 
 **n_coeffs** `n_coeffs[j] = Tr[n_loc · gellmann_tilde(g)[j]]` with g=1:
 
@@ -175,34 +190,15 @@ Same holds for vacuum and flavor-b by symmetry. Reconstruction is correct.
 
 Single-site dot product for flavor-a: `2·(1/3) + (−1)·(−1/2) + (−1/√3)·(1/(2√3)) = 2/3 + 1/2 − 1/6 = 1.0` ✓
 
-**The failure is in `build_left` / `build_right`.** Because `gellmann_bar[0] = I₃/3`, every normalized site contributes `A_k[0] = Tr[(I₃/3)·ρ_k] = 1/3`. The environment tensors therefore accumulate:
+**Root cause of the ~10⁻⁵ symptom (now fixed):** Because `gellmann_bar[0] = I₃/3`, every normalized site has `A_k[0] = 1/3`. Without the factor of `Tr[I₃] = 3` per environment site, the environment tensors accumulated a suppression of `(1/3)^(L−1)` — exactly `(1/3)⁹ ≈ 5 × 10⁻⁵` for L=10.
 
-```
-left_trace[i]  = (1/3)^i
-right_trace[i] = (1/3)^(L−1−i)
-```
-
-So `tensordot_n(i) = (1/3)^(L−1) · 1.0`. For L=10: `(1/3)⁹ ≈ 5.08 × 10⁻⁵` — exactly the observed symptom.
-
-### Root cause
-
-The correct physical environment sum per traced-out site is:
-
-```
-Σ_{j_k} A_k[j_k] · Tr[λ̃_{j_k}]
-```
-
-All Gell-Mann matrices λ₁…λ₈ are traceless, so only j_k=0 survives, contributing `A_k[0] · Tr[I₃] = (1/3) · 3 = 1`. The missing factor per site is `Tr[I₃] = 3`; total missing factor is `3^(L−1)`.
-
-The old code had `gellmann_bar[0] = I₃` (no 1/3), giving `A_k[0] = 1` and environments of 1 — the missing `3^(L−1)` and the wrong normalization cancelled accidentally. When the refactor correctly introduced `I₃/3` to make the dual basis orthonormal, that accidental cancellation broke.
-
-**Fix required:** `build_left` and `build_right` must contract with `3 · A_k[:,0,:]` instead of `A_k[:,0,:]`. The same factor of 3 is missing from the `tr_TEBD` calculation (it currently computes `(1/3)^L` rather than 1).
+**Fix applied:** `build_left` and `build_right` now contract with `3 · A_k[:,0,:]` (one factor of 3 per site, representing `Tr[I₃]`). The `tr_TEBD` loop applies the same factor. With this fix, measurements return integer values at t=0.
 
 ---
 
 ## Suspected Fragile Points
 
-Items marked **FIXED** were resolved in the refactor to standard SU(3) Gell-Mann matrices. Items marked **OPEN** remain outstanding.
+Items marked **FIXED** were resolved. Items marked **OPEN** remain outstanding.
 
 ---
 
@@ -216,10 +212,8 @@ Items marked **FIXED** were resolved in the refactor to standard SU(3) Gell-Mann
 
 ---
 
-**3. `build_left` / `build_right` are missing `Tr[I₃] = 3` per environment site. — OPEN (active bug)**
-See the Normalization Bug Diagnosis section for the full derivation. In brief: each environment contraction uses `A_k[:,0,:]` directly, but the correct physical partial trace requires `3 · A_k[:,0,:]` (the factor of 3 = `Tr[I₃]` comes from tracing out the identity channel). Because `gellmann_bar[0] = I₃/3` now correctly gives `A_k[0] = 1/3`, the missing 3 per site produces a net suppression of `(1/3)^(L−1)` in every measurement and `(1/3)^L` in `tr_TEBD`. This is the cause of the ~10⁻⁵ particle numbers.
-
-Fix: change both `build_left` and `build_right` to contract with `3 * self.A_dict["Ak"][:,0,:]` instead of `self.A_dict["Ak"][:,0,:]`. Apply the same factor to the `tr_TEBD` loop.
+**3. ~~`build_left` / `build_right` were missing `Tr[I₃] = 3` per environment site.~~ — FIXED**
+Each environment contraction now uses `3 · A_k[:,0,:]`. The factor of 3 = `Tr[I₃]` is the physical partial trace contribution from tracing out the identity channel of each environment site. The `tr_TEBD` loop applies the same factor. With the correct normalization, all measurements return physically sensible values (integers at t=0, conserved total number under TEBD within Trotter error).
 
 ---
 
@@ -233,8 +227,8 @@ Fix: change both `build_left` and `build_right` to contract with `3 * self.A_dic
 
 ---
 
-**6. Initial measurement is never populated before the first sweep. — OPEN**
-`ni_persite` is initialized to zeros in `__init__` and only updated inside `measure_TEBD`, which is called at the end of `sweepU`. The notebook stores `ni[j][0]` before the first sweep, so the t=0 column is always zero regardless of the initial configuration.
+**6. ~~Initial measurement not populated before the first sweep.~~ — FIXED**
+`__init__` now calls `self.measure_TEBD()` after constructing the initial MPDO, so `ni_persite` and `tr_TEBD` are populated at t=0 before any sweep runs. The notebook correctly stores `ni[j][0] = mps_evolve.ni_persite[j]` immediately after instantiation.
 
 ---
 
