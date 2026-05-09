@@ -1,10 +1,10 @@
 import numpy as np
 from scipy.linalg import svd
 
-from Hamiltonian import draw_dis, draw_q, build_bond_gates
+from Hamiltonian import draw_dis, draw_q, build_bond_gates, n_loc
 from build_MPDO_from_mps import random_config, initial_MPDO_dict
 
-# from GellMann import g
+from GellMann import gellmann_tilde
 
 class MPDO:
     # Hamiltonian parameters
@@ -24,6 +24,8 @@ class MPDO:
         self.seed   = seed
         self.rng    = np.random.default_rng(self.seed)
         self.g      = g
+        tilde = gellmann_tilde(self.g)
+        self.n_coeffs = np.array([np.trace(n_loc @ tilde[j]) for j in range(9)])
 
         self.Omega_list = draw_dis(self.L, 0, self.W, self.rng)
         self.V_list = draw_dis(self.L - 1, 0, self.W, self.rng)
@@ -42,19 +44,17 @@ class MPDO:
                                                                         # but keep the same initial state, change self.seed
                                                                         # to a fixed seed
         
-        self.A_dict = initial_MPDO_dict(self.L,self.config,self.g)
+        self.A_dict = initial_MPDO_dict(self.L, self.config, self.g)
         self.lmbd_position = 0
-        
-        
 
         # initialize all your measurements
         self.tr_TEBD = 0
-        self.ni_persite = np.zeros(self.L,dtype=np.complex128)
-        self.E_persite = np.zeros(self.L-1,dtype=np.complex128)
+        self.ni_persite = np.zeros(self.L, dtype=np.complex128)
+        self.E_persite = np.zeros(self.L-1, dtype=np.complex128)
         self.E_total_TEBD = 0
-        
-        
-    
+
+        self.measure_TEBD()
+            
     def applyU(self,ind,dirc,U):
         
         # This part relocates lmbd to the right position
@@ -134,8 +134,6 @@ class MPDO:
             elif step < 0:
                 self.move_lmbd_left(self.lmbd_position-1)
                 
-    
-                
     def measure_TEBD(self):
         
         self.left_trace = []
@@ -145,20 +143,19 @@ class MPDO:
         
         #Measure n_i
         for i in range(self.L):
-            self.ni_persite[i] = self.tensordot_l3(i)
+            self.ni_persite[i] = self.tensordot_n(i)
 
         # Measure trace
-        temp = self.A_dict["A0"][:,0,:]
+        temp = 3*self.A_dict["A0"][:,0,:]
         for i in range(1,self.L):
-            temp = np.tensordot(temp,self.A_dict["A"+str(i)][:,0,:],axes=1)
-        temp = temp.flatten()[0]
-        self.tr_TEBD = temp
+            temp = np.tensordot(temp, 3*self.A_dict["A"+str(i)][:,0,:], axes=1)
+        self.tr_TEBD = temp.flatten()[0]
     
     def build_left(self):
         temp = np.reshape(1.+0.*1j,(1,1))
         self.left_trace.append(temp)
         for i in range(1,self.L):
-            temp = np.tensordot(temp,self.A_dict["A"+str(i-1)][:,0,:],axes=1)
+            temp = np.tensordot(temp, 3*self.A_dict["A"+str(i-1)][:,0,:], axes=1)
             self.left_trace.append(temp)
         
     def build_right(self):
@@ -166,13 +163,16 @@ class MPDO:
         self.right_trace.append(temp)
         loop_arr = np.arange(self.L-2,-1,-1)
         for i in loop_arr:
-            temp = np.tensordot(self.A_dict["A"+str(i+1)][:,0,:],temp,axes=1)
+            temp = np.tensordot(3*self.A_dict["A"+str(i+1)][:,0,:], temp, axes=1)
             self.right_trace.append(temp)
         self.right_trace.reverse()
     
-    def tensordot_l3(self, ind):
-        # l_3 at ind which is n_ind?
-        temp = self.left_trace[ind]
-        temp = np.tensordot(temp,self.g*self.A_dict["A"+str(ind)][:,3,:],axes=1)
-        temp = np.tensordot(temp,self.right_trace[ind],axes=1)
-        return temp.flatten()[0]
+    def tensordot_n(self, ind):
+        A_ind = self.A_dict["A"+str(ind)]
+        L_env = self.left_trace[ind]
+        R_env = self.right_trace[ind]
+        result = 0.
+        for j in range(9):
+            if abs(self.n_coeffs[j]) > 1e-12:  # skip zero terms
+                result += self.n_coeffs[j] * (L_env @ A_ind[:,j,:] @ R_env).flatten()[0]
+        return result

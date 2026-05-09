@@ -43,19 +43,22 @@ def build_product_state(L, psi0_config, chi_init=1):
     MPS[-1] = np.einsum('asb, b -> as', MPS[-1], vR)
     return MPS
 
-def initial_MPDO_dict(L,psi_0_config,g=1): # N, Na
+def initial_MPDO_dict(L, psi_0_config, g=1):
     A_dict = {}
-    # disorder
+    rho_vac = np.diag([1., 0., 0.])
+    rho_a   = np.diag([0., 1., 0.])
+    rho_b   = np.diag([0., 0., 1.])
+    
     for i in range(L):
-        A_temp = np.zeros(9,dtype=np.complex128)
+        A_temp = np.zeros(9, dtype=np.complex128)
         if psi_0_config[i] == 0:
-            rho = I_3() - l_3()
-        elif psi_0_config == 1:
-            rho = n_a
-        elif psi_0_config == 2:
-            rho = n_b
+            rho = rho_vac
+        elif psi_0_config[i] == 1:
+            rho = rho_a
+        elif psi_0_config[i] == 2:
+            rho = rho_b
         for j in range(9):
-            A_temp[j] = np.trace(mat_dot2(gellmann_bar(g)[j],rho))
-        key = str("A"+str(i))
-        A_dict[key] = np.reshape(A_temp,(1,9,1))
+            A_temp[j] = np.trace(mat_dot2(gellmann_bar(g)[j], rho))
+        A_dict["A"+str(i)] = np.reshape(A_temp, (1, 9, 1))
     return A_dict
+

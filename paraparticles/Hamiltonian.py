@@ -14,10 +14,10 @@ S_b_plus  = (l_4() - 1j * l_5()) / 2
 S_b_minus = (l_4() + 1j * l_5()) / 2
 
 # local number and magnetization operators
-n_a = (l_3() + l_8()) / 2
-n_b = (l_3() - l_8()) / 2
-n_loc = l_3()
-m_loc = l_8()
+n_a   = I_3()/3 - l_3()/2 + l_8()/(2*np.sqrt(3))
+n_b   = I_3()/3             - l_8()/np.sqrt(3)
+n_loc = n_a + n_b
+m_loc = n_a - n_b
 
 def draw_dis(L, mean, W, rng = None):
     rng = np.random.default_rng() if rng is None else rng
