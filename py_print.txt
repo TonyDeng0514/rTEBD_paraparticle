@@ -1,0 +1,11 @@
+New run, L = 20
+Time step = 1, time taken = 7.709227085113525 for each step
+Time step = 2, time taken = 59.741349935531616 for each step
+Time step = 3, time taken = 60.51190400123596 for each step
+Time step = 4, time taken = 60.234236001968384 for each step
+Time step = 5, time taken = 59.89182901382446 for each step
+Time step = 6, time taken = 60.090922117233276 for each step
+Time step = 7, time taken = 60.07362914085388 for each step
+Time step = 8, time taken = 61.031421184539795 for each step
+Time step = 9, time taken = 60.19694900512695 for each step
+Time step = 10, time taken = 59.87118983268738 for each step

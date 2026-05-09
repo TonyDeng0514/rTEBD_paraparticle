@@ -198,3 +198,55 @@ Each environment contraction now uses `3 · A_k[:,0,:]`. The factor of 3 = `Tr[I
 
 **7. ~~`GellMann.py` returned `np.matrix` objects, not `np.ndarray`.~~ — FIXED**
 `l_1` through `l_8` previously used `np.matrix(…)`. They now use `np.array(…)` throughout, eliminating the risk of silent matrix-multiply semantics and the deprecation warning.
+
+---
+
+## Performance Bottlenecks
+
+Profiled analytically for typical parameters L=20, χ=128, Nt = T/dt sweeps.
+
+### Ranking by expected wall-time impact
+
+| Rank | Operation | Scaling | Notes |
+|---|---|---|---|
+| 1 | Identity-gate SVDs (lmbd relocation) | O(L χ³ Nt) | ~75% of all SVD work; pure overhead |
+| 2 | Real-gate SVDs | O(L χ³ Nt) | Necessary; ~25% of SVD work |
+| 3 | Einsum contractions (all gates) | O(L χ³ Nt) | ~1/9× prefactor vs SVDs |
+| 4 | Dense λ absorption (`np.diag + dot`) | O(L χ³ Nt) | ~1/81× prefactor vs SVDs |
+| 5 | `U_mat` construction (one-time init) | O(L · 9⁷) | 81× redundant krons; paid once at init |
+| 6 | Measurement (`measure_TEBD`) | O(L χ² Nt) | Negligible vs SVDs at any reasonable χ |
+
+### SVD cost and the lmbd relocation problem
+
+Every call to `applyU` SVD-decomposes a `(9χ, 9χ)` matrix at cost O(729χ³). There are two sources:
+
+**Real gates (necessary):** L−1 per sweep, one per bond.
+
+**Identity-gate SVDs (overhead):** `move_lmbd_right/left` applies a full `np.reshape(np.eye(81),(9,9,9,9))` identity through the same einsum + SVD pipeline as a real gate. Tracing through `sweepU`:
+- After the odd-bond pass finishes at lmbd_position = L−1, the first even bond (1,2) requires L−2 left-moves → O(L) identity SVDs before even bonds start.
+- Each subsequent sweep starts with lmbd at ~L/2, requiring ~L/2 right-moves before the first odd bond.
+- Between consecutive same-parity bonds: 1 identity SVD each, ~L/2 per pass.
+
+Rough total: **~3L identity SVDs per sweep** on top of L−1 real SVDs. At L=20 that is ~60 identity vs 19 real — identity SVDs represent approximately 75% of SVD work and are pure canonicalization overhead.
+
+### Einsum contractions
+
+`np.einsum('ijkl,akb,blc->aijc', U, A1, A2, optimize='optimal')` with the optimal path contracting A1⊗A2 first (cost O(81χ³)) then with U (cost O(6561χ²)). For χ ≫ 9 the A1⊗A2 step dominates at O(81χ³), which is 1/9 of the SVD cost. Same ~3L overhead multiplier applies since identity gates go through the same path.
+
+### Dense singular-value absorption
+
+After SVD, `lmbd = np.diag(lmbd)` promotes the 1-D singular-value array to a full (χ', χ') dense matrix, then `np.dot(lmbd, R)` runs an O(χ'² · 9χ_right) ≈ O(9χ³) matrix multiply. Since lmbd is diagonal the correct operation is a row-wise scale at O(9χ²), wasting a factor of χ per gate. Sub-dominant (~1/81 of SVD cost) but straightforwardly fixable.
+
+### `U_mat` construction redundancy
+
+In `Umat.py`, `U_mat` uses a 4-nested loop over 9⁴ = 6561 iterations. Each iteration:
+- Calls `gellmann_bar(g)` and `gellmann_tilde(g)` to index them — each call constructs a fresh list of nine 3×3 matrices. Called 4 × 9⁴ = 26,244 times total per bond.
+- Computes `sg1 = kron(bar[i], bar[j])`, which depends only on (i,j) but is recomputed for every (k,l) pair → **81× redundant**. Same for `sg2 = kron(tilde[k], tilde[l])`.
+
+Optimal construction (precompute the two sets of 81 kron products, then contract with a single batched trace) reduces cost from O(9⁷) to O(9⁴) per bond. This is a one-time init cost but dominates startup for large L.
+
+### Measurement cost
+
+`build_left`/`build_right` each do L−1 contractions of a (1,χ) row vector with a (χ,χ) matrix at O(χ²) each. `tensordot_n` hits only 3 non-zero `n_coeffs` per site (zero terms are already skipped). Total: O(Lχ²) per `measure_TEBD` call. At L=20, χ=128 this is ~2×10⁶ FLOPs vs ~2×10¹⁰ per SVD — four orders of magnitude cheaper, negligible in all regimes.
+
+**Minor additional redundancy:** the `tr_TEBD` loop in `measure_TEBD` re-traverses all L sites contracting the j=0 channel, which is the same sequence of contractions already built in `build_left`. The trace could be read off from `left_trace[-1]` with one additional step.

@@ -1,19 +1,21 @@
 import argparse
 import numpy as np
 from pathlib import Path
+from os.path import exists
+import time
 from paraparticles.MPDO import MPDO
 
 RESULTS_DIR = Path(__file__).parent / "results"
 
 # parameters
-g = 1
-L = 6
-N = 4
-Na = 2
+g = 2
+L = 20
+N = 13
+Na = 6
 t_hop = 1.0
 W = 0.2
 dt = 0.005
-T = 2.0
+T = 0.05
 seed = 1234
 rng = np.random.default_rng(seed)
 parser = argparse.ArgumentParser()
@@ -25,12 +27,26 @@ t_grid = np.linspace(0, T + dt, Nt + 1)
 tr_TB = []
 ni = np.zeros((L, Nt + 1))
 
+if exists("py_print.txt"):
+    f = open("py_print.txt","w")
+    f.write(f'New run, L = {L}\n')
+    f.close
+else:
+    f = open("py_print.txt","x")
+    f.write(f'New run, L = {L}\n')
+    f.close()
 mps_evolve = MPDO(L, N, Na, t_hop, W, dt, T, chi, seed, g)
 for j in range(L):
     ni[j][0] = mps_evolve.ni_persite[j]
 
 for i in range(1, Nt + 1):
+    t1 = time.time()
     mps_evolve.sweepU()
+    t2 = time.time()
+    f = open("py_print.txt","a")
+    f.write('Time step = '+str(i)+', time taken = '+str(t2-t1)+' for each step\n')
+    f.close()
+    print('Time step = '+str(i)+', time taken = '+str(t2-t1)+' for each step')
     for j in range(L):
         ni[j][i] = mps_evolve.ni_persite[j]
     tr_TB.append(mps_evolve.tr_TEBD)
