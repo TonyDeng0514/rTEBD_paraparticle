@@ -6,7 +6,7 @@ from paraparticles.MPDO import MPDO
 RESULTS_DIR = Path(__file__).parent / "results"
 
 # parameters
-g = 2
+g = 1
 L = 6
 N = 4
 Na = 2
