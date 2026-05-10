@@ -18,7 +18,7 @@ G_IDX=$((IDX % 40))
 
 CHI_LIST=(64 128)
 CHI=${CHI_LIST[$CHI_IDX]}
-G=$(python3 -c "import numpy as np; print(f'{np.linspace(1,3,40)[${G_IDX}]:.6f}')")
+G=$(python3 -c "print(f'{1 + ${G_IDX} * 2.0 / 39:.6f}')")
 
 PROJECT_DIR="$HOME/EoS_project/rTEBD"
 RUN_DIR="$SHARED_SCRATCH/td62/bond_conv_chi${CHI}_gidx${G_IDX}_${SLURM_JOB_ID}"
