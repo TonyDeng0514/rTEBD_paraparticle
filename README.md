@@ -128,7 +128,9 @@ Indices: (i, j) = output operator basis on sites (left, right); (k, l) = input o
    - `'right'` (λ absorbed right): `A1 = reshape(Lp, (χ₁, 9, χ'))`, `A2 = reshape(λ·R, (χ', 9, χ₂))`, `lmbd_position = ind[1]`
    - `'left'` (λ absorbed left): `A1 = reshape(Lp·λ, (χ₁, 9, χ'))`, `A2 = reshape(R, (χ', 9, χ₂))`, `lmbd_position = ind[0]`
 
-**Sweep order** (`sweepU`): odd bonds (0,1), (2,3), … then even bonds (1,2), (3,4), … all with `dirc='right'`. Both odd and even bond gates are built with the full step `τ` (`Hamiltonian.py`), giving a simple first-order Trotter decomposition exp(−iH_odd·τ) · exp(−iH_even·τ) per sweep.
+**Gate lists** (`build_bond_gates`): returns two lists of `(i, gate)` tuples, where `i` is the left-site index of the bond. Odd-bond list: `[(0, U₀₁), (2, U₂₃), …]`; even-bond list: `[(1, U₁₂), (3, U₃₄), …]`. Both lists use the full step `τ`, giving a first-order Trotter decomposition exp(−iH_odd·τ) · exp(−iH_even·τ) per sweep.
+
+**Sweep order** (`sweepU`): iterates odd then even tuples, unpacking `(i, U)` directly and calling `applyU([i, i+1], 'right', U)`. Bond positions are not recomputed from the enumerate index.
 
 ---
 

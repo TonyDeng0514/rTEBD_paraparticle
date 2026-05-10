@@ -8,19 +8,21 @@ from paraparticles.MPDO import MPDO
 RESULTS_DIR = Path(__file__).parent / "results"
 
 # parameters
-g = 2
 L = 20
 N = 13
 Na = 6
 t_hop = 1.0
 W = 0.2
-dt = 0.005
-T = 0.05
+dt = 0.05
+T = 20.0
 seed = 1234
 rng = np.random.default_rng(seed)
 parser = argparse.ArgumentParser()
 parser.add_argument("--chi", type=int, required=True, help="bond dimension")
-chi = parser.parse_args().chi
+parser.add_argument("--g", type=float, required=True, help="Gell-Mann scaling factor")
+args = parser.parse_args()
+chi = args.chi
+g = args.g
 Nt = int(T / dt)
 t_grid = np.linspace(0, T + dt, Nt + 1)
 

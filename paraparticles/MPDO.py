@@ -116,10 +116,10 @@ class MPDO:
         
     def sweepU(self):
 
-        for i,U in enumerate(self.odd_bonds_U):
-            self.applyU([2*i,2*i+1],'right',U)
-        for i, U in enumerate(self.even_bonds_U):
-            self.applyU([2*i+1,2*i+2],'right',U)
+        for i, U in self.odd_bonds_U:
+            self.applyU([i, i+1], 'right', U)
+        for i, U in self.even_bonds_U:
+            self.applyU([i, i+1], 'right', U)
     
         
         self.measure_TEBD()
