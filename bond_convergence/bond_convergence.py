@@ -40,6 +40,7 @@ else:
 mps_evolve = MPDO(L, N, Na, t_hop, W, dt, T, chi, seed, g)
 for j in range(L):
     ni[j][0] = mps_evolve.ni_persite[j]
+tr_TB.append(mps_evolve.tr_TEBD)  # t=0 trace
 
 for i in range(1, Nt + 1):
     t1 = time.time()
@@ -53,7 +54,7 @@ for i in range(1, Nt + 1):
         ni[j][i] = mps_evolve.ni_persite[j]
     tr_TB.append(mps_evolve.tr_TEBD)
 
-tr_TB = np.array(tr_TB)  # convert list → array before saving
+tr_TB = np.array(tr_TB).real  # convert list → array before saving
 
 # Save everything in one .npz file
 np.savez(
