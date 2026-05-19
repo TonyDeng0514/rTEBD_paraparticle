@@ -56,12 +56,12 @@ rTEBD/
 | 0 | I₃ | identity / trace channel |
 | 1 | g·λ₁ | off-diagonal vac–a |
 | 2 | g·λ₂ | off-diagonal vac–a (imaginary) |
-| 3 | g·λ₃ = g·diag(1,−1,0) | standard SU(3) generator (traceless) |
+| 3 | g²·λ₃ = g²·diag(1,−1,0) | diagonal generator (traceless); scaled by g² |
 | 4 | g·λ₄ | off-diagonal vac–b |
 | 5 | g·λ₅ | off-diagonal vac–b (imaginary) |
 | 6 | g·λ₆ | off-diagonal a–b |
 | 7 | g·λ₇ | off-diagonal a–b (imaginary) |
-| 8 | g·λ₈ = g·(1/√3)·diag(1,1,−2) | standard SU(3) generator (traceless) |
+| 8 | g²·λ₈ = g²·(1/√3)·diag(1,1,−2) | diagonal generator (traceless); scaled by g² |
 
 Physical number operators expressed in this basis (from `Hamiltonian.py`):
 
@@ -71,9 +71,9 @@ n_b   = I₃/3 − λ₈/√3              = diag(0,0,1)
 n_loc = n_a + n_b                   = diag(0,1,1)
 ```
 
-**Dual basis:** `gellmann_bar(g)[j]` = {I₃/3, λ₁/(2g), λ₂/(2g), …, λ₈/(2g)}.
+**Dual basis:** `gellmann_bar(g)[j]` = {I₃/3, λⱼ/g for j=1,2,4,5,6,7, λⱼ/g² for j=3,8}.
 
-Orthonormality: `Tr[λ̄_j · λ̃_k] = δ_{jk}` for all j, k. Verified by `check_orthonormality()` in `GellMann.py`.
+Orthonormality: `Tr[λ̄_j · λ̃_k] = 2δ_{jk}` for j,k=1..8 (norm-2 convention). Verified by `check_orthonormality()` in `GellMann.py`. Because the norm is 2, expansion coefficients are extracted as `Tr(bar[j] @ ρ) / 2` for j≥1 (see `initial_MPDO_dict`), and the superoperator tensor is divided by N[i]·N[j] with N[0]=1, N[j]=2 (see `U_mat`).
 
 **Each site tensor** `A_dict["Ai"]` has shape `(χ_left, 9, χ_right)`:
 
@@ -81,7 +81,7 @@ Orthonormality: `Tr[λ̄_j · λ̃_k] = δ_{jk}` for all j, k. Verified by `chec
 - Axis 1: operator-basis index j ∈ {0,…,8}
 - Axis 2: right bond (dimension χ_right)
 
-The component at index j is `A[j] = Tr(λ̄_j · ρ_local)`. The density matrix is reconstructed as ρ = Σ_{j₀,…,j_{L−1}} C(j₀,…) · λ̃_{j₀} ⊗ … ⊗ λ̃_{j_{L−1}}, where C is the MPS scalar given by the matrix product of the A tensors at those indices.
+The component at index j is the true expansion coefficient `A[j] = Tr(bar[j] · ρ_local) / N_j` where N_0=1, N_j=2 for j≥1. The density matrix is reconstructed as ρ = Σ_{j₀,…,j_{L−1}} C(j₀,…) · λ̃_{j₀} ⊗ … ⊗ λ̃_{j_{L−1}}, where C is the MPS scalar given by the matrix product of the A tensors at those indices.
 
 **Initial state** (see `build_MPDO_from_mps.py`): product state, χ = 1, shape (1,9,1). Local density matrices and their non-zero Gell-Mann coefficients (g=1):
 
@@ -98,10 +98,10 @@ The component at index j is `A[j] = Tr(λ̄_j · ρ_local)`. The density matrix 
 **Gate construction** (`Umat.py`):
 
 ```
-U_all[i,j,k,l] = Tr( (λ̄_i ⊗ λ̄_j) · U₉ₓ₉ · (λ̃_k ⊗ λ̃_l) · U†₉ₓ₉ )
+U_all[i,j,k,l] = Tr( (λ̄_i ⊗ λ̄_j) · U₉ₓ₉ · (λ̃_k ⊗ λ̃_l) · U†₉ₓ₉ ) / (N_i · N_j)
 ```
 
-Indices: (i, j) = output operator basis on sites (left, right); (k, l) = input operator basis on sites (left, right). Shape (9,9,9,9). With U = I₉ this correctly reduces to δ_{ik}·δ_{jl}, verified by `check_Umat()` in `Umat.py`.
+where N_0=1, N_j=2 for j=1..8. The division compensates for the norm-2 dual pair so that the einsum in `applyU` maps true expansion coefficients correctly. Indices: (i, j) = output operator basis on sites (left, right); (k, l) = input operator basis on sites (left, right). Shape (9,9,9,9). With U = I₉ this correctly reduces to δ_{ik}·δ_{jl}, verified by `check_Umat()` in `Umat.py`.
 
 **`applyU(ind, dirc, U)`** step by step:
 
@@ -156,7 +156,7 @@ n_coeffs[j] = Tr[ n_loc · gellmann_tilde(g)[j] ]   (precomputed at init)
 result = Σ_j  n_coeffs[j] · (left_trace[ind] @ A_ind[:,j,:] @ right_trace[ind])
 ```
 
-For g=1 the non-zero coefficients are: `n_coeffs[0]=2`, `n_coeffs[3]=−1`, `n_coeffs[8]=−1/√3`. All other Gell-Mann matrices have zero overlap with `n_loc` and are skipped.
+The non-zero coefficients are: `n_coeffs[0]=2`, `n_coeffs[3]=−g²`, `n_coeffs[8]=−g²/√3`. All other Gell-Mann matrices have zero overlap with `n_loc` and are skipped.
 
 **Trace** (`tr_TEBD`): contracts `3·A_i[:,0,:]` across all sites — this is the physical trace `Tr[ρ]`, which equals 1 for a normalized state.
 
@@ -174,7 +174,7 @@ Items marked **FIXED** were resolved. Items marked **OPEN** remain outstanding.
 ---
 
 **2. ~~Operator basis completeness was not verified.~~ — FIXED**
-`gellmann_bar` previously used `I₃` (no 1/3 factor) and `(1/g)·λⱼ` for j≥1, giving `Tr[λ̄_j·λ̃_k] ≠ δ_{jk}`. It now uses `I₃/3` and `λⱼ/(2g)`, satisfying `Tr[λ̄_j·λ̃_k] = δ_{jk}` for all j,k. `check_orthonormality()` was added to `GellMann.py` and passes.
+`gellmann_bar` previously used `I₃` (no 1/3 factor) and `(1/g)·λⱼ` for j≥1, giving `Tr[λ̄_j·λ̃_k] ≠ δ_{jk}`. It now uses `I₃/3` and `λⱼ/g` (or `λⱼ/g²` for the diagonal generators j=3,8), giving `Tr[λ̄_j·λ̃_k] = 2δ_{jk}` for j,k=1..8. The norm-2 factor is compensated explicitly: `initial_MPDO_dict` divides coefficients by 2 for j≥1, and `U_mat` divides by N[i]·N[j]. `check_orthonormality()` was added to `GellMann.py` and passes.
 
 ---
 

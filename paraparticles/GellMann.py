@@ -92,21 +92,24 @@ def gellmann_normal():
 
 def gellmann_tilde(g=1):
     return [np.eye(3),          g*np.array(l_1()),g*np.array(l_2()),
-            g*np.array(l_3()),  g*np.array(l_4()),g*np.array(l_5()),
-            g*np.array(l_6()),  g*np.array(l_7()),g*np.array(l_8())]
+            g**2*np.array(l_3()),  g*np.array(l_4()),g*np.array(l_5()),
+            g*np.array(l_6()),  g*np.array(l_7()),g**2*np.array(l_8())]
 
 def gellmann_bar(g=1):
-    return [np.eye(3)/3,              np.array(l_1()) / (2*g), np.array(l_2()) / (2*g),
-            np.array(l_3()) / (2*g),  np.array(l_4()) / (2*g), np.array(l_5()) / (2*g),
-            np.array(l_6()) / (2*g),  np.array(l_7()) / (2*g), np.array(l_8()) / (2*g)]
+    return [np.eye(3)/3,            np.array(l_1()) / (g), np.array(l_2()) / (g),
+            np.array(l_3()) / (g**2),  np.array(l_4()) / (g), np.array(l_5()) / (g),
+            np.array(l_6()) / (g),  np.array(l_7()) / (g), np.array(l_8()) / (g**2)]
 
-def check_orthonormality(g=1):
+def check_orthonormality(g=2):
+    """Verify Tr(bar[j] @ tilde[k]) = 2*delta_{jk} for j,k=1..8.
+    Norm is 2 (not 1) because bar uses l_j/g (or l_j/g^2) without an extra 1/2.
+    Downstream code (U_mat, initial_MPDO_dict) accounts for this explicitly."""
     tilde = gellmann_tilde(g)
     bar   = gellmann_bar(g)
-    for j in range(9):
-        for k in range(9):
+    for j in range(1,9):
+        for k in range(1,9):
             val = np.trace(bar[j] @ tilde[k])
-            expected = 1.0 if j == k else 0.0
+            expected = 2.0 if j == k else 0.0
             assert abs(val - expected) < 1e-10, f"Failed at j={j}, k={k}: got {val}"
     print("Orthonormality check passed.")
 

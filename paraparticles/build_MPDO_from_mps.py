@@ -44,6 +44,14 @@ def build_product_state(L, psi0_config, chi_init=1):
     return MPS
 
 def initial_MPDO_dict(L, psi_0_config, g=1):
+    """Build a chi=1 product-state MPDO from a configuration vector.
+
+    Each site tensor A_dict["A{i}"] has shape (1, 9, 1). The j-th entry stores
+    the true expansion coefficient c_j of rho_i in the tilde basis:
+        c_j = Tr(bar[j] @ rho_i) / N[j]
+    where N[0]=1 and N[j]=2 for j=1..8, compensating for the norm-2 dual pair
+    convention Tr(bar[j]@tilde[j])=2 for j>=1.
+    """
     A_dict = {}
     rho_vac = np.diag([1., 0., 0.])
     rho_a   = np.diag([0., 1., 0.])
@@ -59,6 +67,7 @@ def initial_MPDO_dict(L, psi_0_config, g=1):
             rho = rho_b
         for j in range(9):
             A_temp[j] = np.trace(mat_dot2(gellmann_bar(g)[j], rho))
+        A_temp[1:] /= 2   # Tr(bar[j]@tilde[j])=2 for j=1..8; divide out to get true coefficients
         A_dict["A"+str(i)] = np.reshape(A_temp, (1, 9, 1))
     return A_dict
 
