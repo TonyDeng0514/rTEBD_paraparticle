@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import svd
 
-from .Hamiltonian import draw_dis, draw_q, build_bond_gates, n_loc
+from .Hamiltonian import draw_dis, draw_q, build_bond_gates, n_loc, build_bond_hamiltonians_tilde
 from .build_MPDO_from_mps import random_config, initial_MPDO_dict
 from .GellMann import gellmann_tilde
 
@@ -29,6 +29,12 @@ class MPDO:
         self.Omega_list = draw_dis(self.L, 0, self.W, self.rng)
         self.V_list = draw_dis(self.L - 1, 0, self.W, self.rng)
         self.q_list = draw_q(self.L, 0, self.W, self.rng)
+
+        h_tilde_list = build_bond_hamiltonians_tilde(L, t_hop, self.Omega_list, self.q_list, self.V_list)
+        self.h_coeffs_list = [
+            np.array([[np.trace(h @ np.kron(tilde[j], tilde[k])) for k in range(9)] for j in range(9)])
+            for h in h_tilde_list
+        ]
 
         # Initialize U
         self.odd_bonds_U, self.even_bonds_U = build_bond_gates(self.L,
@@ -144,6 +150,11 @@ class MPDO:
         for i in range(self.L):
             self.ni_persite[i] = self.tensordot_n(i)
 
+        # Measure bond energies
+        for i in range(self.L - 1):
+            self.E_persite[i] = self.tensordot_E(i)
+        self.E_total_TEBD = np.sum(self.E_persite).real
+
         # Measure trace
         temp = 3*self.A_dict["A0"][:,0,:]
         for i in range(1,self.L):
@@ -166,6 +177,19 @@ class MPDO:
             self.right_trace.append(temp)
         self.right_trace.reverse()
     
+    def tensordot_E(self, ind):
+        A1 = self.A_dict["A"+str(ind)]
+        A2 = self.A_dict["A"+str(ind+1)]
+        L_env = self.left_trace[ind]
+        R_env = self.right_trace[ind+1]
+        h_coeffs = self.h_coeffs_list[ind]
+        result = 0.+0j
+        for j in range(9):
+            for k in range(9):
+                if abs(h_coeffs[j, k]) > 1e-12:
+                    result += h_coeffs[j, k] * (L_env @ A1[:,j,:] @ A2[:,k,:] @ R_env).flatten()[0]
+        return result
+
     def tensordot_n(self, ind):
         A_ind = self.A_dict["A"+str(ind)]
         L_env = self.left_trace[ind]

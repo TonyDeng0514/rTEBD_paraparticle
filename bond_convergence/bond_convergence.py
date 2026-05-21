@@ -14,7 +14,7 @@ Na = 6
 t_hop = 1.0
 W = 0.2
 dt = 0.05
-T = 20.0
+T = 80.0
 seed = 1234
 rng = np.random.default_rng(seed)
 parser = argparse.ArgumentParser()
@@ -27,6 +27,7 @@ Nt = int(T / dt)
 t_grid = np.linspace(0, T + dt, Nt + 1)
 
 tr_TB = []
+E_total = []
 ni = np.zeros((L, Nt + 1))
 
 if exists("py_print.txt"):
@@ -40,7 +41,8 @@ else:
 mps_evolve = MPDO(L, N, Na, t_hop, W, dt, T, chi, seed, g)
 for j in range(L):
     ni[j][0] = mps_evolve.ni_persite[j]
-tr_TB.append(mps_evolve.tr_TEBD)  # t=0 trace
+tr_TB.append(mps_evolve.tr_TEBD)      # t=0 trace
+E_total.append(mps_evolve.E_total_TEBD)  # t=0 energy
 
 for i in range(1, Nt + 1):
     t1 = time.time()
@@ -53,14 +55,17 @@ for i in range(1, Nt + 1):
     for j in range(L):
         ni[j][i] = mps_evolve.ni_persite[j]
     tr_TB.append(mps_evolve.tr_TEBD)
+    E_total.append(mps_evolve.E_total_TEBD)
 
-tr_TB = np.array(tr_TB).real  # convert list → array before saving
+tr_TB = np.array(tr_TB).real
+E_total = np.array(E_total)
 
 # Save everything in one .npz file
 np.savez(
     RESULTS_DIR / f"ni_L{L}_N{N}_chi{chi}_g{g}.npz",
     ni=ni,
     tr_TB=tr_TB,
+    E_total=E_total,
     t_grid=t_grid,
     # store parameters as 0-d arrays so they round-trip cleanly
     L=L, N=N, Na=Na, t_hop=t_hop, W=W, dt=dt, T=T, chi=chi, g=g, seed=seed,

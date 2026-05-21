@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=bond_conv
 #SBATCH --account=commons
-#SBATCH --partition=commons          # change to commons for longer runs
+#SBATCH --partition=long
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
-#SBATCH --time=12:00:00
+#SBATCH --time=72:00:00
 #SBATCH --array=0-79         # 2 chi values x 40 g values
 #SBATCH --output=/home/td62/EoS_project/rTEBD/bond_convergence/logs/bond_%A_%a.out
 #SBATCH --error=/home/td62/EoS_project/rTEBD/bond_convergence/logs/bond_%A_%a.err
