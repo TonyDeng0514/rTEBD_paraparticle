@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --time=72:00:00
-#SBATCH --array=0-79         # 2 chi values x 40 g values
+#SBATCH --array=0-119        # 3 chi values x 40 g values
 #SBATCH --output=/home/td62/EoS_project/rTEBD/bond_convergence/logs/bond_%A_%a.out
 #SBATCH --error=/home/td62/EoS_project/rTEBD/bond_convergence/logs/bond_%A_%a.err
 
@@ -16,9 +16,9 @@ IDX=${SLURM_ARRAY_TASK_ID}
 CHI_IDX=$((IDX / 40))
 G_IDX=$((IDX % 40))
 
-CHI_LIST=(64 128)
+CHI_LIST=(64 128 256)
 CHI=${CHI_LIST[$CHI_IDX]}
-G=$(python3 -c "print(f'{1 + ${G_IDX} * 2.0 / 39:.6f}')")
+G=$(python3 -c "print(f'{1.5 + ${G_IDX} * 1.5 / 39:.6f}')")
 
 PROJECT_DIR="$HOME/EoS_project/rTEBD"
 RUN_DIR="$SHARED_SCRATCH/td62/bond_conv_chi${CHI}_gidx${G_IDX}_${SLURM_JOB_ID}"

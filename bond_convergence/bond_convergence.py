@@ -56,18 +56,12 @@ for i in range(1, Nt + 1):
         ni[j][i] = mps_evolve.ni_persite[j]
     tr_TB.append(mps_evolve.tr_TEBD)
     E_total.append(mps_evolve.E_total_TEBD)
-
-tr_TB = np.array(tr_TB).real
-E_total = np.array(E_total)
-
-# Save everything in one .npz file
-np.savez(
-    RESULTS_DIR / f"ni_L{L}_N{N}_chi{chi}_g{g}.npz",
-    ni=ni,
-    tr_TB=tr_TB,
-    E_total=E_total,
-    t_grid=t_grid,
-    # store parameters as 0-d arrays so they round-trip cleanly
-    L=L, N=N, Na=Na, t_hop=t_hop, W=W, dt=dt, T=T, chi=chi, g=g, seed=seed,
-)
-print("Saved.")
+    np.savez(
+        RESULTS_DIR / f"ni_L{L}_N{N}_chi{chi}_g{g}.npz",
+        ni=ni,
+        tr_TB=np.array(tr_TB).real,
+        E_total=np.array(E_total),
+        t_grid=t_grid,
+        L=L, N=N, Na=Na, t_hop=t_hop, W=W, dt=dt, T=T, chi=chi, g=g, seed=seed,
+    )
+    print(f"Saved up to step {i}.")
